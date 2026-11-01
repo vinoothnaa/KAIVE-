@@ -119,7 +119,7 @@ button .badge{width:22px;height:22px;font-size:12px;margin-right:2px}
 .search input{padding-left:36px}
 
 /* ---------- tables ---------- */
-.wrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;margin-top:12px}
+.wrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;margin-top:12px;position:relative}
 table{border-collapse:collapse;width:100%;font-size:14px}
 th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--line);vertical-align:middle}
 th{font-weight:600;color:var(--ink-2);font-size:13px;background:var(--band);white-space:nowrap}
@@ -309,6 +309,27 @@ details.vil-manage[open] summary .chev{transform:rotate(90deg)}
 @media print{#pageTransport{display:none !important}}
 </style>
 <style>
+/* ---------- Settings ---------- */
+#pageSettings .st-pass{display:flex;gap:8px}
+#pageSettings .st-pass input{font-family:var(--mono);letter-spacing:.02em}
+#pageSettings .st-pass button{flex:none}
+#pageSettings td{vertical-align:middle}
+#pageSettings tr.st-off td{color:var(--ink-3)}
+#pageSettings .st-status{display:inline-flex;align-items:center;font-size:12.5px;font-weight:700;border-radius:999px;padding:3px 10px}
+#pageSettings .st-status.on{background:var(--ok-soft);color:var(--ok)}
+#pageSettings .st-status.off{background:var(--red-soft);color:var(--red)}
+#pageSettings .pill{margin:0}
+#pageSettings .pill.st-member{background:#EEF1EC;color:var(--ink-2)}
+#pageSettings .st-you{margin-left:6px;vertical-align:1px}
+#pageSettings .st-when{white-space:nowrap;color:var(--ink-2)}
+#pageSettings .st-act{white-space:nowrap;text-align:right}
+#pageSettings .st-act button{min-height:32px;padding:5px 11px;font-size:13px;margin-left:6px}
+#pageSettings .st-share{border-color:var(--gold);background:var(--gold-soft)}
+#pageSettings .st-share pre{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-family:var(--mono);font-size:14px;margin:0 0 10px;white-space:pre-wrap;word-break:break-all}
+#pageSettings code{font-family:var(--mono);background:var(--band);padding:1px 5px;border-radius:4px}
+@media print{#pageSettings{display:none !important}}
+</style>
+<style>
 /* login gate + sync status */
 html.kc-locked .appbar,html.kc-locked .main{visibility:hidden}
 #kcGate{position:fixed;inset:0;z-index:100;display:none;align-items:center;justify-content:center;padding:24px max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px));
@@ -436,7 +457,7 @@ html.kc-locked #kcGate{display:flex}
       if(uploads.includes(k)) pending.set(k,JSON.stringify(next));
     }
     raw.set(MERGED,JSON.stringify(merged));
-    pulled=true; KC.ready=true;
+    pulled=true; KC.ready=true; window.dispatchEvent(new Event('kc-ready'));
     if(changed){
       // the page loaded older data; its load-time writes are stale, so send only the first-time merges and reload
       for(const k of [...pending.keys()]) if(!uploads.includes(k)) pending.delete(k);
@@ -449,11 +470,22 @@ html.kc-locked #kcGate{display:flex}
   }
 
   function applyRole(){
-    const tab=document.getElementById('tabPayslipBtn'); if(!tab) return;
-    if(KC.role==='admin'){ tab.hidden=false; return; }
-    tab.hidden=true;
-    if(document.getElementById('pagePayslip').classList.contains('active')) document.getElementById('tabListBtn').click();
+    const admin=KC.role==='admin';
+    [['tabPayslipBtn','pagePayslip'],['tabSettingsBtn','pageSettings']].forEach(([t,p])=>{
+      const tab=document.getElementById(t), page=document.getElementById(p); if(!tab) return;
+      tab.hidden=!admin;
+      if(!admin&&page&&page.classList.contains('active')) document.getElementById('tabListBtn').click();
+    });
   }
+  // call the admin-users server function as the signed-in user
+  KC.fn=async function(body,retry=true){
+    const t=await fresh();
+    const r=await fetch(SB_URL+'/functions/v1/admin-users',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+t,'Content-Type':'application/json'},body:JSON.stringify(body)});
+    if(r.status===401&&retry){ session.expires_at=0; return KC.fn(body,false); }
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(j.error||j.message||('Server error '+r.status));
+    return j;
+  };
 
   // ---- sign in / out ----
   function signOutLocal(){ session=null; raw.rm(SKEY); TRACK.forEach(raw.rm); raw.rm(MERGED); }
@@ -477,21 +509,22 @@ html.kc-locked #kcGate{display:flex}
       e.preventDefault(); err.textContent='';
       const btn=form.querySelector('button'); btn.disabled=true; btn.textContent='Signing in…';
       try{
-        keep(await authCall('token?grant_type=password',{email:document.getElementById('kcEmail').value.trim(),password:document.getElementById('kcPass').value}));
+        const id=document.getElementById('kcEmail').value.trim().toLowerCase();
+        keep(await authCall('token?grant_type=password',{email:id.includes('@')?id:id+'@users.kaive.app',password:document.getElementById('kcPass').value}));
         const r=await pull(); if(KC.role!=='none'&&r!=='reloading') location.reload();
       }catch(ex){
-        err.textContent=/invalid/i.test(ex.message)?'Email or password is wrong.':(ex.message==='Failed to fetch'?'Could not reach the server. Check your internet connection.':ex.message);
+        err.textContent=/invalid/i.test(ex.message)?'Login ID or password is wrong.':/banned/i.test(ex.message)?'This login has been disabled. Ask an admin.':(ex.message==='Failed to fetch'?'Could not reach the server. Check your internet connection.':ex.message);
         btn.disabled=false; btn.textContent='Sign in';
       }
     });
     document.getElementById('kcGateOut').onclick=signOut;
     if(!session) return;
-    document.getElementById('kcEmail2').textContent=session.email;
+    document.getElementById('kcEmail2').textContent=(session.email||'').replace(/@users\.kaive\.app$/,'');
     document.getElementById('kcLogout').onclick=signOut;
     applyRoleFromCache();
     pull().catch(e=>{ if(e.message==='signed-out'){ location.reload(); return; } status(navigator.onLine?'Not synced · '+e.message:'Offline · changes wait','bad'); setTimeout(()=>pull().catch(()=>{}),15000); });
   });
-  function applyRoleFromCache(){ if(raw.get(PAY)==null){ const t=document.getElementById('tabPayslipBtn'); if(t) t.hidden=true; } }
+  function applyRoleFromCache(){ if(raw.get(PAY)==null){ const t=document.getElementById('tabPayslipBtn'); if(t) t.hidden=true; } else { const st=document.getElementById('tabSettingsBtn'); if(st) st.hidden=false; } }
   window.addEventListener('online',()=>{ for(const k of [...pending.keys()]) push(k); });
 })();
 </script>
@@ -504,7 +537,7 @@ html.kc-locked #kcGate{display:flex}
     <h1 id="kcTitle">Sign in to Kaive</h1>
     <p>Operations dashboard</p>
     <form id="kcForm" novalidate>
-      <label for="kcEmail">Email</label><input id="kcEmail" type="email" autocomplete="username" required>
+      <label for="kcEmail">Email or username</label><input id="kcEmail" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required>
       <label for="kcPass">Password</label><input id="kcPass" type="password" autocomplete="current-password" required>
       <button type="submit">Sign in</button>
       <div id="kcErr" class="kc-err" role="alert"></div>
@@ -527,6 +560,7 @@ html.kc-locked #kcGate{display:flex}
     <button class="side-btn" id="tabDprBtn"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="3"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span><span class="lbl">Daily Report</span></button>
     <button class="side-btn" id="tabTransportBtn"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="6" width="14" height="10" rx="1"/><path d="M15 9h4l3 3v4h-7z"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></svg></span><span class="lbl">Transport</span></button>
     <button class="side-btn" id="tabPayslipBtn"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><polyline points="14 3 14 8 19 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg></span><span class="lbl">Payslips</span></button>
+    <button class="side-btn" id="tabSettingsBtn" hidden><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></span><span class="lbl">Settings</span></button>
   </nav>
   </div>
 </header>
@@ -746,6 +780,56 @@ html.kc-locked #kcGate{display:flex}
     <div id="dprHist"></div>
     <div class="row" style="margin-top:10px"><button class="secondary" id="dprExp">Export backup</button><button class="secondary" id="dprImpBtn">Import backup</button><input type="file" id="dprImp" accept=".json" hidden></div>
   </div>
+</div>
+
+<div class="page" id="pageSettings">
+  <section class="card">
+    <div class="section-head">
+      <h2 style="margin:0">Logins</h2>
+      <button class="gold" id="stAddBtn" type="button">+ Add login</button>
+    </div>
+    <p class="muted" style="margin:0">Give each person their own login. <b>Admins</b> can see everything, including Payslips and this Settings page. <b>Members</b> can use every other tab. A disabled login can't sign in, and its access stops right away.</p>
+  </section>
+
+  <section class="card" id="stFormCard" hidden>
+    <h2 id="stFormTitle" style="margin:0 0 4px">Add a login</h2>
+    <p class="muted" id="stFormHint" style="margin:0 0 6px">Use a short username (e.g. <code>ravi</code>) or the person's email address.</p>
+    <form id="stForm" autocomplete="off" novalidate>
+      <div class="row">
+        <div id="stLoginWrap"><label for="stLogin">Login ID (username or email)</label><input id="stLogin" autocomplete="off" placeholder="e.g. ravi or ravi@gmail.com"></div>
+        <div id="stNameWrap"><label for="stName">Full name</label><input id="stName" autocomplete="off" placeholder="e.g. Ravi Kumar"></div>
+        <div id="stTitleWrap"><label for="stTitle">Title</label><input id="stTitle" autocomplete="off" placeholder="e.g. Site Engineer"></div>
+      </div>
+      <div class="row">
+        <div id="stRoleWrap"><label for="stRole">Access</label>
+          <select id="stRole"><option value="member">Member: all tabs except Payslips and Settings</option><option value="admin">Admin: everything</option></select>
+        </div>
+        <div id="stPassWrap"><label for="stPass">Password (at least 8 characters)</label>
+          <div class="st-pass"><input id="stPass" type="text" autocomplete="new-password" spellcheck="false"><button class="secondary" id="stGen" type="button">Generate</button></div>
+        </div>
+      </div>
+      <div class="row" style="margin-top:14px">
+        <button type="submit" id="stSave">Create login</button>
+        <button class="secondary" type="button" id="stCancel">Cancel</button>
+      </div>
+      <div class="status" id="stMsg" role="status" aria-live="polite"></div>
+    </form>
+  </section>
+
+  <section class="card st-share" id="stShare" hidden>
+    <h2 style="margin:0 0 6px">Send these details to <span id="stShareName"></span></h2>
+    <p class="muted" style="margin:0 0 10px">The password is shown only now. Share it privately, for example on WhatsApp, and ask them to keep it safe.</p>
+    <pre id="stShareText"></pre>
+    <div class="row"><button class="secondary" id="stCopy" type="button">Copy details</button><button class="secondary" id="stShareClose" type="button">Done</button></div>
+  </section>
+
+  <section class="card">
+    <div class="wrap" style="margin-top:0"><table>
+      <thead><tr><th>Login ID</th><th>Name</th><th>Title</th><th>Access</th><th>Status</th><th>Last login</th><th><span class="sr-only">Actions</span></th></tr></thead>
+      <tbody id="stBody"><tr><td colspan="7" class="muted">Loading logins…</td></tr></tbody>
+    </table></div>
+    <div class="status" id="stListMsg" role="status" aria-live="polite"></div>
+  </section>
 </div>
 
 <div class="page" id="pageTransport">
@@ -1059,7 +1143,7 @@ renderAll();
 });
 
 // ---- tabs ----
-const TAB_SIDE = {pageList:'tabListBtn', pageDupe:'tabDupeBtn', pageShield:'tabShieldBtn', pageDpr:'tabDprBtn', pageTransport:'tabTransportBtn', pagePayslip:'tabPayslipBtn'};
+const TAB_SIDE = {pageList:'tabListBtn', pageDupe:'tabDupeBtn', pageShield:'tabShieldBtn', pageDpr:'tabDprBtn', pageTransport:'tabTransportBtn', pagePayslip:'tabPayslipBtn', pageSettings:'tabSettingsBtn'};
 Object.entries(TAB_SIDE).forEach(([pid,bid])=> document.getElementById(bid).onclick = ()=> switchTab(pid));
 const PAGE_META = {
   pageList:  ['Consumer List Dashboard', 'Type entries manually or paste WhatsApp text, saved to this browser'],
@@ -1067,6 +1151,7 @@ const PAGE_META = {
   pageShield:['Number Shield', 'Keep long IDs from being mangled or zeroed out by Excel'],
   pageDpr:   ['Daily Report', 'Turn today\u2019s USN list into a formatted village-wise report'],
   pageTransport:['Transport', 'Material dispatch log, one row per challan, saved online'],
+  pageSettings:['Settings', 'Create and manage logins for your team'],
   pagePayslip:['Payslips', 'Create payslips, then print them or save them as PDF']
 };
 function switchTab(pageId){
@@ -2445,6 +2530,128 @@ let tt; function toast(t){ const el=$('toast'); el.textContent=t; el.classList.a
 $('f_date').value = new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
 render();
 
+})();
+</script>
+<script>
+// ---- Settings: manage logins (admins only; the work happens in the admin-users server function) ----
+(function(){
+  const USER_DOMAIN='@users.kaive.app';
+  const $s=id=>document.getElementById(id);
+  const esc=v=>String(v==null?'':v).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const loginId=u=>u.username||(u.email.endsWith(USER_DOMAIN)?u.email.slice(0,-USER_DOMAIN.length):u.email);
+  const when=iso=>{ if(!iso) return 'Never'; const d=new Date(iso); const p=n=>String(n).padStart(2,'0');
+    return `${p(d.getDate())}/${p(d.getMonth()+1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`; };
+  let users=[], me='', mode='create', target=null, loaded=false;
+
+  function msg(el,t,err){ el.textContent=t||''; el.className='status'+(err?' err':''); }
+  function genPass(){
+    const sets=['ABCDEFGHJKLMNPQRSTUVWXYZ','abcdefghijkmnpqrstuvwxyz','23456789','#@$%'];
+    const all=sets.join(''); const a=new Uint32Array(12); crypto.getRandomValues(a);
+    let s=sets.map((set,i)=>set[a[i]%set.length]).join('');
+    for(let i=4;i<12;i++) s+=all[a[i]%all.length];
+    return s.split('').sort(()=>Math.random()-.5).join('');
+  }
+
+  async function load(){
+    msg($s('stListMsg'),'');
+    try{
+      const r=await KC.fn({action:'list'}); users=r.users||[]; me=r.me||''; loaded=true; render();
+    }catch(e){ $s('stBody').innerHTML='<tr><td colspan="7" class="muted">Could not load logins.</td></tr>'; msg($s('stListMsg'),e.message,true); }
+  }
+  function render(){
+    if(!users.length){ $s('stBody').innerHTML='<tr><td colspan="7" class="muted">No logins yet. Click Add login.</td></tr>'; return; }
+    $s('stBody').innerHTML=users.map(u=>{
+      const isMe=u.email===me, off=u.status!=='active';
+      return `<tr class="${off?'st-off':''}">
+        <td><b>${esc(loginId(u))}</b>${isMe?' <span class="pill hit st-you">You</span>':''}</td>
+        <td>${esc(u.full_name||'—')}</td><td>${esc(u.title||'—')}</td>
+        <td><span class="pill ${u.role==='admin'?'':'st-member'}">${u.role==='admin'?'Admin':'Member'}</span></td>
+        <td><span class="st-status ${off?'off':'on'}">${off?'Disabled':'Active'}</span></td>
+        <td class="st-when">${when(u.last_sign_in_at)}</td>
+        <td class="st-act">
+          <button class="secondary" data-a="edit" data-e="${esc(u.email)}" type="button">Edit</button>
+          ${isMe?'':`<button class="secondary" data-a="toggle" data-e="${esc(u.email)}" type="button">${off?'Enable':'Disable'}</button>`}
+          <button class="secondary" data-a="reset" data-e="${esc(u.email)}" type="button">Reset password</button>
+          ${isMe?'':`<button class="danger" data-a="delete" data-e="${esc(u.email)}" type="button">Delete</button>`}
+        </td></tr>`;
+    }).join('');
+  }
+
+  function openForm(m,u){
+    mode=m; target=u||null; $s('stShare').hidden=true;
+    const f={login:$s('stLoginWrap'),name:$s('stNameWrap'),title:$s('stTitleWrap'),role:$s('stRoleWrap'),pass:$s('stPassWrap')};
+    msg($s('stMsg'),'');
+    if(m==='create'){
+      $s('stFormTitle').textContent='Add a login'; $s('stFormHint').innerHTML='Use a short username (e.g. <code>ravi</code>) or the person’s email address.';
+      ['login','name','title','role','pass'].forEach(k=>f[k].hidden=false);
+      $s('stLogin').value=''; $s('stName').value=''; $s('stTitle').value=''; $s('stRole').value='member'; $s('stPass').value=genPass();
+      $s('stSave').textContent='Create login';
+    }else if(m==='edit'){
+      $s('stFormTitle').textContent='Edit '+loginId(u); $s('stFormHint').textContent='Change the name, title or access. To change the password, use Reset password.';
+      f.login.hidden=true; f.pass.hidden=true; f.name.hidden=false; f.title.hidden=false; f.role.hidden=false;
+      $s('stName').value=u.full_name||''; $s('stTitle').value=u.title||''; $s('stRole').value=u.role;
+      $s('stSave').textContent='Save changes';
+    }else{
+      $s('stFormTitle').textContent='Reset password for '+loginId(u); $s('stFormHint').textContent='Set a new password. The old one stops working immediately.';
+      ['login','name','title','role'].forEach(k=>f[k].hidden=true); f.pass.hidden=false; $s('stPass').value=genPass();
+      $s('stSave').textContent='Set new password';
+    }
+    $s('stFormCard').hidden=false; $s('stFormCard').scrollIntoView({behavior:'smooth',block:'start'});
+    (m==='create'?$s('stLogin'):m==='edit'?$s('stName'):$s('stPass')).focus();
+  }
+  function closeForm(){ $s('stFormCard').hidden=true; }
+  function share(name,login,pass){
+    $s('stShareName').textContent=name||login;
+    $s('stShareText').textContent=`Kaive dashboard\nLink: ${location.origin}${location.pathname}\nLogin ID: ${login}\nPassword: ${pass}`;
+    $s('stShare').hidden=false; $s('stShare').scrollIntoView({behavior:'smooth',block:'start'});
+  }
+
+  $s('stForm').addEventListener('submit',async e=>{
+    e.preventDefault();
+    const btn=$s('stSave'), label=btn.textContent; btn.disabled=true; btn.textContent='Saving…'; msg($s('stMsg'),'');
+    try{
+      if(mode==='create'){
+        const login=$s('stLogin').value.trim(), pass=$s('stPass').value;
+        if(!login) throw new Error('Enter a username or email.');
+        if(pass.length<8) throw new Error('Password must be at least 8 characters.');
+        await KC.fn({action:'create',login,password:pass,full_name:$s('stName').value,title:$s('stTitle').value,role:$s('stRole').value});
+        closeForm(); await load(); share($s('stName').value.trim(),login.toLowerCase(),pass);
+      }else if(mode==='edit'){
+        await KC.fn({action:'update',email:target.email,full_name:$s('stName').value,title:$s('stTitle').value,role:$s('stRole').value});
+        closeForm(); await load(); msg($s('stListMsg'),'Saved changes for '+loginId(target)+'.');
+      }else{
+        const pass=$s('stPass').value; if(pass.length<8) throw new Error('Password must be at least 8 characters.');
+        await KC.fn({action:'reset_password',email:target.email,password:pass});
+        closeForm(); await load(); share(target.full_name,loginId(target),pass);
+      }
+    }catch(ex){ msg($s('stMsg'),ex.message,true); }
+    btn.disabled=false; btn.textContent=label;
+  });
+  $s('stBody').addEventListener('click',async e=>{
+    const b=e.target.closest('button[data-a]'); if(!b) return;
+    const u=users.find(x=>x.email===b.dataset.e); if(!u) return;
+    const a=b.dataset.a;
+    if(a==='edit') return openForm('edit',u);
+    if(a==='reset') return openForm('reset',u);
+    if(a==='delete'&&!b.dataset.sure){ b.dataset.sure=1; b.textContent='Click again to delete'; setTimeout(()=>{ if(b.isConnected){ b.textContent='Delete'; delete b.dataset.sure; } },3000); return; }
+    b.disabled=true; msg($s('stListMsg'),'');
+    try{
+      if(a==='toggle'){ await KC.fn({action:'set_status',email:u.email,status:u.status==='active'?'disabled':'active'}); await load(); msg($s('stListMsg'),(u.status==='active'?'Disabled ':'Enabled ')+loginId(u)+'.'); }
+      if(a==='delete'){ await KC.fn({action:'delete',email:u.email}); await load(); msg($s('stListMsg'),'Deleted '+loginId(u)+'.'); }
+    }catch(ex){ msg($s('stListMsg'),ex.message,true); b.disabled=false; }
+  });
+  $s('stAddBtn').onclick=()=>openForm('create');
+  $s('stCancel').onclick=closeForm;
+  $s('stGen').onclick=()=>{ $s('stPass').value=genPass(); };
+  $s('stShareClose').onclick=()=>{ $s('stShare').hidden=true; $s('stShareText').textContent=''; };
+  $s('stCopy').onclick=async()=>{
+    const t=$s('stShareText').textContent;
+    try{ await navigator.clipboard.writeText(t); $s('stCopy').textContent='Copied'; }
+    catch(e){ const r=document.createRange(); r.selectNodeContents($s('stShareText')); const sel=getSelection(); sel.removeAllRanges(); sel.addRange(r); $s('stCopy').textContent='Selected, press Ctrl+C'; }
+    setTimeout(()=>{ $s('stCopy').textContent='Copy details'; },2000);
+  };
+  $s('tabSettingsBtn').addEventListener('click',()=>{ if(!loaded) load(); });
+  window.addEventListener('kc-ready',()=>{ if($s('pageSettings').classList.contains('active')) load(); });
 })();
 </script>
 </main>
