@@ -340,6 +340,22 @@ details.vil-manage[open] summary .chev{transform:rotate(90deg)}
 #pageTransport .btn.quiet{background:transparent;border-color:transparent;color:var(--ink-2);padding:4px 8px;min-height:30px;font-weight:500}
 #pageTransport .btn.quiet:hover{color:var(--ink);border-color:var(--line)}
 #pageTransport .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+#pageTransport .tr-review{border-color:var(--gold);box-shadow:0 0 0 3px rgba(191,156,78,.18)}
+#pageTransport .rv-stats{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px}
+#pageTransport .rv-chip{border-radius:8px;padding:6px 12px;font-size:14px;border:1px solid var(--line);background:var(--band)}
+#pageTransport .rv-chip b{font-size:16px}
+#pageTransport .rv-chip.new{background:var(--ok-soft);border-color:#C9DCC4;color:var(--ok)}
+#pageTransport .rv-chip.upd{background:var(--gold-soft);border-color:#E9D9AE;color:var(--gold-ink)}
+#pageTransport .rv-chip.skip{background:var(--red-soft);border-color:#E2C3BD;color:var(--red)}
+#pageTransport .tr-review h3{font-size:15px;font-weight:600;margin:16px 0 8px}
+#pageTransport .tr-review h3 small{font-weight:400;color:var(--ink-3);font-size:13px;margin-left:6px}
+#pageTransport .rv-list{display:flex;flex-wrap:wrap;gap:6px;margin:0}
+#pageTransport .rv-list span{border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:13.5px;font-weight:600}
+#pageTransport .rv-list small{font-weight:400;color:var(--ink-3)}
+#pageTransport table.rv-table{min-width:520px}
+#pageTransport .rv-old{color:var(--ink-3);text-decoration:line-through}
+#pageTransport .rv-new{color:var(--ok);font-weight:600}
+#pageTransport .rv-skip{margin:0;padding-left:20px;font-size:14px;color:var(--red)}
 #tr_toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--forest);color:#fff;padding:11px 18px;border-radius:10px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s;max-width:calc(100% - 32px);z-index:60}
 #tr_toast.show{opacity:1}
 @media (max-width:600px){#pageTransport .filters input{min-width:0;width:100%}#pageTransport .tr-actions{width:100%}#pageTransport .tr-actions>*{flex:1}}
@@ -911,13 +927,21 @@ html.kc-locked .mbar,html.kc-locked .sidebar{visibility:hidden}
             <p class="menu-foot">Opens in Excel with a summary, the full register and a by-site sheet.</p>
           </div>
         </div>
-        <button class="secondary" id="tr_importXlsx" type="button">Load Excel</button>
+        <button class="secondary" id="tr_importXlsx" type="button">Add from Excel</button>
         <button class="secondary" id="tr_backup" type="button">Save backup</button>
-        <button class="secondary" id="tr_restore" type="button">Restore backup</button>
+        <button class="secondary" id="tr_restore" type="button">Add from backup</button>
         <input type="file" id="tr_fileX" accept=".xlsx" hidden>
         <input type="file" id="tr_fileJ" accept=".json" hidden>
       </div>
     </div>
+  </section>
+
+  <section class="card tr-review" id="tr_review" hidden aria-labelledby="tr_revTitle">
+    <h2 id="tr_revTitle" style="margin:0 0 4px">Review import from <span id="tr_revFile"></span></h2>
+    <p class="muted" style="margin:0 0 12px">Nothing is saved yet. Challans are matched by number; existing challans are never removed, and blank site, vehicle or remark cells keep what's already there.</p>
+    <div class="rv-stats" id="tr_revStats"></div>
+    <div id="tr_revDetail"></div>
+    <div class="form-foot"><button type="button" id="tr_revApply">Apply</button><button class="secondary" type="button" id="tr_revNewOnly">Add new only</button><button class="secondary" type="button" id="tr_revCancel">Cancel</button></div>
   </section>
 
   <div class="grid2" id="tr_summary">
@@ -2116,6 +2140,8 @@ function clean(r){
   NUM.forEach(k => { const v = parseFloat(r[k]); o[k] = isFinite(v) && v>0 ? v : 0; });
   return o;
 }
+const ckey=v=>String(v??'').trim().toLowerCase().replace(/^bksgp\s*\/\s*/,'').replace(/\s*\/\s*\d{2}-\d{2}$/,'').replace(/\s+/g,'');
+const shortNo=v=>String(v??'').trim().replace(/^bksgp\s*\/\s*/i,'').replace(/\s*\/\s*\d{2}-\d{2}$/,'');
 function dmy(iso){ if(!iso) return ''; const [y,m,d]=iso.split('-'); return `${d}-${m}-${y}`; }
 function monthName(ym){ const [y,m]=ym.split('-'); return new Date(+y,+m-1,1).toLocaleString('en-IN',{month:'long',year:'numeric'}); }
 
@@ -2248,7 +2274,8 @@ $('form').addEventListener('submit', e => {
   const r = clean(raw);
   if(!r.date) { $('f_date').focus(); return setMsg('Enter the challan date.','err'); }
   if(!r.challan) { $('f_challan').focus(); return setMsg('Enter the challan number.','err'); }
-  const dup = state.rows.find(x => x.challan.toLowerCase()===r.challan.toLowerCase() && x.id!==editingId);
+  r.challan = shortNo(r.challan);
+  const dup = state.rows.find(x => ckey(x.challan)===ckey(r.challan) && x.id!==editingId);
   if(dup) { $('f_challan').focus(); return setMsg(`Challan ${r.challan} is already in the register (${dmy(dup.date)}). Edit that row instead.`,'err'); }
   if(!NUM.some(k=>r[k])) return setMsg('Enter at least one quantity.','err');
   if(editingId){ r.id = editingId; state.rows = state.rows.map(x => x.id===editingId?r:x); }
@@ -2567,11 +2594,84 @@ $('fileX').onchange = async e => {
       out.push(clean({date:d, challan:a[1], panels:a[2], inverters:a[4], acdc:a[6], c6:a[8], c16:a[9], c4r:a[10], c4b:a[11], mms:a[12], site:a[14], vehicle:a[15], remarks:a[16]}));
     }
     if(!out.length) return toast('No challan rows found. The sheet needs data starting on row 3.');
-    if(confirm(`Replace the ${state.rows.length} challans here with ${out.length} challans from ${file.name}?`)){
-      state.rows = out; persist(); endEdit(false); render(); toast(`Loaded ${out.length} challans.`);
-    }
+    showReview(planMerge(out), file.name);
   }catch(err){ console.error(err); toast('Could not read that file. Use an .xlsx in the original transport sheet layout.'); }
 };
+
+
+// ---------- merge imported challans into the register (never replaces it) ----------
+const FIELDS=[['date','Date'],['panels','Panels'],['inverters','Inverters'],['acdc','AC/DC'],['mms','MMS'],['c6','6 sqmm'],['c16','16 sqmm'],['c4r','4 sqmm red'],['c4b','4 sqmm black'],['site','Site'],['vehicle','Vehicle'],['remarks','Remarks']];
+const TEXT=new Set(['site','vehicle','remarks']);
+// "BKSGP/1705/26-27", "1705" and " 1705 " are the same challan
+const showVal=(k,v)=>k==='date'?dmy(v):(v===''||v==null?'(blank)':String(v));
+let review=null;
+function planMerge(incoming){
+  const have=new Map(state.rows.map(r=>[ckey(r.challan),r]));
+  const seen=new Map(), skipped=[];
+  incoming.forEach((r,i)=>{
+    const k=ckey(r.challan);
+    if(!k){ skipped.push({r,why:'No challan number'}); return; }
+    if(!r.date){ skipped.push({r,why:'No valid date'}); return; }
+    if(seen.has(k)){
+      const prev=seen.get(k); if(prev==='conflict') return;
+      // the same challan twice: fine if date and quantities agree; blank site/vehicle/remark cells just fill in
+      if(FIELDS.some(([f])=>!TEXT.has(f)&&String(prev[f])!==String(r[f]))){ seen.set(k,'conflict'); skipped.push({r,why:'Appears twice in the file with different numbers'}); return; }
+      TEXT.forEach(f=>{ if(!String(prev[f]||'').trim()&&String(r[f]||'').trim()) prev[f]=r[f]; });
+      return;
+    }
+    seen.set(k,Object.assign({},r,{challan:shortNo(r.challan)}));
+  });
+  const add=[], upd=[], same=[];
+  seen.forEach((r,k)=>{
+    if(r==='conflict') return;
+    const old=have.get(k);
+    if(!old){ add.push(r); return; }
+    const next=Object.assign({},old), changes=[];
+    FIELDS.forEach(([f,label])=>{
+      let v=r[f];
+      if(TEXT.has(f) && !String(v||'').trim()) return;          // a blank cell never wipes a site, vehicle or remark
+      if(String(old[f]??'')!==String(v??'')){ changes.push({f,label,from:old[f],to:v}); next[f]=v; }
+    });
+    changes.length ? upd.push({old,next,changes}) : same.push(old);
+  });
+  add.sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);
+  return {add,upd,same,skipped,total:incoming.length};
+}
+function showReview(plan,name){
+  review=plan;
+  const box=$('review'); box.hidden=false;
+  $('revFile').textContent=name;
+  const chip=(n,t,c)=>`<span class="rv-chip ${c}"><b>${n}</b> ${t}</span>`;
+  $('revStats').innerHTML=chip(plan.add.length,'new','new')+chip(plan.upd.length,'changed','upd')+chip(plan.same.length,'already here, unchanged','same')+(plan.skipped.length?chip(plan.skipped.length,'skipped','skip'):'');
+  let h='';
+  if(plan.add.length) h+=`<h3>New challans</h3><p class="rv-list">${plan.add.map(r=>`<span>${esc(r.challan)} <small>${dmy(r.date)}</small></span>`).join('')}</p>`;
+  if(plan.upd.length) h+=`<h3>Changed challans <small>current value → value in the file</small></h3><div class="scroll"><table class="rv-table"><thead><tr><th class="l">Challan</th><th class="l">Field</th><th class="l">Now</th><th class="l">From file</th></tr></thead><tbody>`+
+    plan.upd.map(u=>u.changes.map((c,i)=>`<tr>${i?'<td></td>':`<td class="l" rowspan="1"><b>${esc(u.old.challan)}</b></td>`}<td class="l">${c.label}</td><td class="l rv-old">${esc(showVal(c.f,c.from))}</td><td class="l rv-new">${esc(showVal(c.f,c.to))}</td></tr>`).join('')).join('')+`</tbody></table></div>`;
+  if(plan.skipped.length) h+=`<h3>Skipped</h3><ul class="rv-skip">${plan.skipped.map(x=>`<li><b>${esc(x.r.challan||'(no number)')}</b>${x.r.date?' '+dmy(x.r.date):''}: ${x.why}</li>`).join('')}</ul>`;
+  if(!plan.add.length && !plan.upd.length) h+=`<p class="muted">Nothing to add. Every challan in this file is already in the register with the same numbers.</p>`;
+  $('revDetail').innerHTML=h;
+  $('revApply').hidden=!(plan.add.length||plan.upd.length);
+  $('revApply').textContent=plan.upd.length&&plan.add.length?`Add ${plan.add.length} new and update ${plan.upd.length}`:plan.upd.length?`Update ${plan.upd.length} challan${plan.upd.length>1?'s':''}`:`Add ${plan.add.length} new challan${plan.add.length>1?'s':''}`;
+  $('revNewOnly').hidden=!(plan.add.length&&plan.upd.length);
+  $('revNewOnly').textContent=`Add ${plan.add.length} new only`;
+  $('revCancel').textContent=(plan.add.length||plan.upd.length)?'Cancel':'Close';
+  box.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function applyReview(withUpdates){
+  if(!review) return;
+  const byId=new Map(state.rows.map(r=>[r.id,r]));
+  if(withUpdates) review.upd.forEach(u=>byId.set(u.old.id,u.next));
+  review.add.forEach(r=>{ const n=Object.assign({},r,{id:uid()}); byId.set(n.id,n); });
+  state.rows=[...byId.values()];
+  persist(); endEdit(false); render();
+  const parts=[]; if(review.add.length) parts.push(`${review.add.length} added`); if(withUpdates&&review.upd.length) parts.push(`${review.upd.length} updated`);
+  toast(parts.length?`Done: ${parts.join(', ')}. ${state.rows.length} challans in total.`:'Nothing changed.');
+  closeReview();
+}
+function closeReview(){ review=null; $('review').hidden=true; $('revDetail').innerHTML=''; }
+$('revApply').onclick=()=>applyReview(true);
+$('revNewOnly').onclick=()=>applyReview(false);
+$('revCancel').onclick=closeReview;
 
 // json backup
 $('backup').onclick = () => {
@@ -2584,9 +2684,7 @@ $('fileJ').onchange = async e => {
   try{
     const s = JSON.parse(await file.text());
     if(!Array.isArray(s.rows)) throw 0;
-    if(confirm(`Replace the ${state.rows.length} challans here with ${s.rows.length} from this backup?`)){
-      state = {perHome: s.perHome||4, rows: s.rows.map(clean)}; persist(); endEdit(false); render(); toast(`Restored ${s.rows.length} challans.`);
-    }
+    showReview(planMerge(s.rows.map(r=>clean(Object.assign({},r,{id:null})))), file.name);
   }catch(err){ toast('That file is not a dispatch log backup.'); }
 };
 
