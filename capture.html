@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0E2A1E">
+<title>Field Capture · KAIVE</title>
+<style>
+:root{--g:#0E2A1E;--g2:#163D2B;--gold:#C9A227;--ink:#1B1F1C;--mut:#5E665F;--bg:#F4F2EA;--ok:#1E7B46;--warn:#B7791F;--bad:#B42318;--line:#DAD6C8}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans Telugu",sans-serif}
+header{background:var(--g);color:#fff;padding:14px 16px 12px;position:sticky;top:0;z-index:5;border-bottom:3px solid var(--gold)}
+header .brand{font-weight:800;letter-spacing:.08em;font-size:18px}
+header .brand b{color:var(--gold)}
+header .sub{font-size:13px;color:#C8D2CB}
+main{max-width:640px;margin:0 auto;padding:12px 12px 120px}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;margin:12px 0}
+.card h2{margin:0 0 8px;font-size:15px;text-transform:uppercase;letter-spacing:.06em;color:var(--g2)}
+.te{color:var(--mut);font-size:13px;font-weight:400;text-transform:none;letter-spacing:0}
+label{display:block;font-size:14px;color:var(--mut);margin:6px 0 4px}
+input,select,textarea{width:100%;font:inherit;padding:12px;border:1.5px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--g2)}
+.usc{font-size:22px;letter-spacing:.06em;font-variant-numeric:tabular-nums}
+button{font:inherit;font-weight:700;border:0;border-radius:10px;padding:12px 16px;cursor:pointer;min-height:48px}
+.btn{background:var(--g);color:#fff}.btn:disabled{opacity:.45}
+.btn-gold{background:var(--gold);color:#1B1300}
+.btn-ghost{background:#EFEBDD;color:var(--ink)}
+.row{display:flex;gap:8px;align-items:center}.row>*{flex:1}.row>.fit{flex:0 0 auto}
+.gps{display:flex;gap:10px;align-items:center}
+.dot{width:14px;height:14px;border-radius:50%;background:#bbb;flex:0 0 auto}
+.dot.ok{background:var(--ok)}.dot.warn{background:var(--warn)}.dot.bad{background:var(--bad)}
+.mono{font-variant-numeric:tabular-nums;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:14px}
+.house{border-left:4px solid var(--gold);padding:8px 10px;background:#FBF8EE;border-radius:8px;margin-top:10px}
+.house .nm{font-weight:800;font-size:17px}
+.tag{display:inline-block;font-size:12px;font-weight:700;padding:3px 8px;border-radius:99px;background:#E7EFE9;color:var(--g2);margin:4px 4px 0 0}
+.tag.p1{background:#FBE3DF;color:#8A1C12}.tag.p3{background:#E3ECF8;color:#1D4A85}
+.shot{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid #EEE}
+.shot:first-child{border-top:0}
+.shot .lbl{flex:1}.shot .lbl small{display:block;color:var(--mut);font-size:12px}
+.cnt{min-width:28px;text-align:center;font-weight:800;border-radius:8px;padding:4px 6px;background:#EEE}
+.cnt.done{background:#D9F0E2;color:var(--ok)}
+.msg{padding:10px 12px;border-radius:10px;margin-top:10px;font-size:14px}
+.msg.warn{background:#FFF4DB;color:#6B4A0A}.msg.bad{background:#FDE7E4;color:#7A1A10}.msg.ok{background:#E2F3E9;color:#14532D}
+.near button{margin:6px 6px 0 0;min-height:40px;padding:8px 10px;font-size:14px}
+#qbar{position:fixed;left:0;right:0;bottom:0;background:var(--g);color:#fff;padding:10px 14px calc(10px + env(safe-area-inset-bottom));display:flex;gap:10px;align-items:center;justify-content:space-between;font-size:14px;z-index:6}
+#qbar b{color:var(--gold)}
+#cam{position:fixed;inset:0;background:#000;z-index:20;display:none;flex-direction:column}
+#cam.on{display:flex}
+#cam video,#cam canvas{flex:1;width:100%;min-height:0;object-fit:contain;background:#000}
+#cam .top{color:#fff;padding:10px 14px;font-size:14px;display:flex;justify-content:space-between;gap:10px}
+#cam .bar{display:flex;gap:10px;padding:12px 14px calc(14px + env(safe-area-inset-bottom));justify-content:center;align-items:center}
+#shutter{width:76px;height:76px;border-radius:50%;background:#fff;border:6px solid var(--gold);padding:0}
+#cam .bar button{min-width:110px}
+.today li{padding:4px 0;font-size:14px}
+.hide{display:none!important}
+.small{font-size:13px;color:var(--mut)}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><b>KAIVE</b> · FIELD CAPTURE</div>
+  <div class="sub">Valence Energies — site photos with GPS stamp</div>
+</header>
+<main>
+  <div id="badlink" class="card hide"><div class="msg bad"><b>This link is incomplete.</b> Ask the office for the correct field link.</div></div>
+
+  <section class="card">
+    <h2>1 · Worker <span class="te">మీ పేరు</span></h2>
+    <input id="worker" placeholder="Your name" autocomplete="name">
+  </section>
+
+  <section class="card">
+    <h2>2 · Location <span class="te">లొకేషన్</span></h2>
+    <div class="gps"><span id="gdot" class="dot"></span><div><div id="gtxt">Getting GPS… allow location when asked.</div><div id="gsub" class="mono small"></div></div></div>
+    <div id="gmsg"></div>
+  </section>
+
+  <section class="card">
+    <h2>3 · USC number <span class="te">USC నంబర్ (బిల్లు నుండి)</span></h2>
+    <div class="row">
+      <input id="usc" class="usc" inputmode="numeric" pattern="[0-9]*" maxlength="14" placeholder="3711…" autocomplete="off">
+      <button id="find" class="btn fit">Find</button>
+    </div>
+    <div class="small" style="margin-top:6px">Type the USC exactly as printed on the electricity bill.</div>
+    <div id="result"></div>
+  </section>
+
+  <section id="shots" class="card hide">
+    <h2>4 · Photos <span class="te">ఫోటోలు తీయండి</span></h2>
+    <div id="shotlist"></div>
+    <div class="row" style="margin-top:10px">
+      <select id="extra"></select>
+      <button id="extrabtn" class="btn-ghost fit">📷 Extra</button>
+    </div>
+  </section>
+
+  <section id="finish" class="card hide">
+    <h2>5 · Submit <span class="te">సమర్పించండి</span></h2>
+    <label for="outcome">Result of this visit</label>
+    <select id="outcome">
+      <option value="done">Done — all photos taken</option>
+      <option value="partial">Partly done — some photos pending</option>
+      <option value="locked">Not possible — house locked / nobody home</option>
+      <option value="refused">Not possible — consumer refused</option>
+      <option value="no_material">Not possible — material / system not at site</option>
+      <option value="other">Other (write below)</option>
+    </select>
+    <label for="note">Note (optional)</label>
+    <textarea id="note" rows="2" placeholder="Anything the office should know"></textarea>
+    <button id="submit" class="btn btn-gold" style="width:100%;margin-top:12px">Submit this house</button>
+    <div id="fmsg"></div>
+  </section>
+
+  <section class="card">
+    <h2>Today on this phone</h2>
+    <ul id="today" class="today" style="margin:0;padding-left:18px"></ul>
+  </section>
+</main>
+
+<div id="qbar"><span id="qtxt">All photos uploaded</span><span id="net" class="small" style="color:#C8D2CB"></span></div>
+
+<div id="cam">
+  <div class="top"><span id="camlbl"></span><span id="camgps" class="mono"></span></div>
+  <video id="video" playsinline muted autoplay></video>
+  <canvas id="canvas" class="hide"></canvas>
+  <div class="bar" id="barShoot"><button id="camclose" class="btn-ghost">Cancel</button><button id="shutter" aria-label="Take photo"></button><span style="min-width:110px"></span></div>
+  <div class="bar hide" id="barReview"><button id="retake" class="btn-ghost">Retake</button><button id="usephoto" class="btn btn-gold">Use photo</button></div>
+</div>
+
+<script>
+(function(){
+'use strict';
+const API='https://sbfopluuxbyrlbbxzkgo.supabase.co/functions/v1/field-capture';
+const KEY=new URLSearchParams(location.search).get('k')||'';
+const $=id=>document.getElementById(id);
+const LS={get:(k,d)=>{try{const v=localStorage.getItem(k);return v===null?d:JSON.parse(v)}catch(e){return d}},set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+if(!KEY){$('badlink').classList.remove('hide');}
+
+/* ---------- photo types ---------- */
+const T={
+  panel:['Panels on roof','Installer must be standing in the photo'],
+  inverter:['Inverter on wall','Whole inverter + DCDB/ACDB visible'],
+  mserial1:['Panel serial label 1','Close-up, serial number readable'],
+  mserial2:['Panel serial label 2','Close-up, serial number readable'],
+  mserial3:['Panel serial label 3','Close-up, serial number readable'],
+  mserial4:['Panel serial label 4','Close-up, serial number readable'],
+  invserial:['Inverter serial label','Close-up of the label on the inverter'],
+  earthing:['Earthing pit',''],
+  bill:['Electricity bill','USC number clearly visible'],
+  civil1:['Civil structure 1','Pedestals / structure on roof'],
+  civil2:['Civil structure 2','Second angle of pedestals / structure'],
+  other:['Other photo','']
+};
+const SET={
+  civil:['civil1','civil2','inverter'],
+  install:['panel','inverter','mserial1','mserial2','mserial3','mserial4','invserial','earthing','bill'],
+  serials:['mserial1','mserial2','mserial3','mserial4','invserial']
+};
+function needed(h){
+  if(!h) return ['bill','panel','inverter','civil1','civil2'];
+  const g=h.task_group||'', t=(h.tasks||'').toLowerCase(); let s=[];
+  if(g==='Civil form') s=SET.civil;
+  else if(g==='New installation') s=[...SET.install,'civil1','civil2'];
+  else if(g==='Install form missing') s=SET.install;
+  else if(g==='Retake photo') s=['panel'];
+  else if(g==='Duplicate site check') s=[...SET.serials,'panel','bill'];
+  else if(g==='Serial re-photo') s=t.includes('module')?SET.serials:['invserial'];
+  else s=['bill'];
+  if(t.includes('civil')) s=[...s,...SET.civil];
+  if(t.includes('retake')) s=['panel',...s];
+  return [...new Set(s)];
+}
+
+/* ---------- worker ---------- */
+$('worker').value=LS.get('kc_worker','');
+$('worker').addEventListener('change',e=>LS.set('kc_worker',e.target.value.trim()));
+
+/* ---------- GPS ---------- */
+let fix=null; // {lat,lon,acc,at}
+function gpsUi(){
+  const d=$('gdot'), m=$('gmsg');
+  if(!fix){ d.className='dot bad'; return; }
+  const age=Math.round((Date.now()-fix.at)/1000);
+  $('gtxt').textContent=`${fix.lat.toFixed(6)}, ${fix.lon.toFixed(6)}`;
+  $('gsub').textContent=`±${Math.round(fix.acc)} m · updated ${age}s ago`;
+  const good=fix.acc<=30&&age<30, ok=fix.acc<=100&&age<60;
+  d.className='dot '+(good?'ok':ok?'warn':'bad');
+  m.innerHTML=good?'':ok?'<div class="msg warn">GPS is weak. Step outside / near the house for a better signal.</div>':'<div class="msg bad">No good GPS yet. Photos are blocked until the location is accurate (under 100 m).</div>';
+}
+function startGps(){
+  if(!('geolocation' in navigator)){ $('gtxt').textContent='This phone/browser has no GPS access. Use Chrome.'; return; }
+  navigator.geolocation.watchPosition(p=>{ fix={lat:p.coords.latitude,lon:p.coords.longitude,acc:p.coords.accuracy||999,at:Date.now()}; gpsUi(); },
+    e=>{ $('gtxt').textContent=e.code===1?'Location permission denied. Allow location for this site in browser settings, then reload.':'Waiting for GPS… ('+e.message+')'; $('gdot').className='dot bad'; },
+    {enableHighAccuracy:true,maximumAge:0,timeout:30000});
+  setInterval(gpsUi,3000);
+}
+startGps();
+const gpsOk=()=>fix&&fix.acc<=100&&(Date.now()-fix.at)<60000;
+
+/* ---------- API ---------- */
+async function api(body){
+  const r=await fetch(API,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(Object.assign({key:KEY},body))});
+  const j=await r.json().catch(()=>({error:'Bad response'}));
+  if(!r.ok) throw new Error(j.error||('Error '+r.status));
+  return j;
+}
+
+/* ---------- IndexedDB upload queue ---------- */
+let db;
+function idb(){ return db?Promise.resolve(db):new Promise((res,rej)=>{ const o=indexedDB.open('kaive_capture',1); o.onupgradeneeded=()=>o.result.createObjectStore('q',{keyPath:'id'}); o.onsuccess=()=>{db=o.result;res(db)}; o.onerror=()=>rej(o.error); }); }
+async function qAll(){ const d=await idb(); return new Promise(r=>{const t=d.transaction('q').objectStore('q').getAll(); t.onsuccess=()=>r(t.result||[]); t.onerror=()=>r([]);}); }
+async function qPut(v){ const d=await idb(); return new Promise((r,j)=>{const t=d.transaction('q','readwrite'); t.objectStore('q').put(v); t.oncomplete=r; t.onerror=()=>j(t.error);}); }
+async function qDel(id){ const d=await idb(); return new Promise(r=>{const t=d.transaction('q','readwrite'); t.objectStore('q').delete(id); t.oncomplete=r; t.onerror=r;}); }
+const uid=()=>(crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(36).slice(2));
+let pumping=false, lastErr='';
+async function pump(){
+  if(pumping) return; pumping=true;
+  try{
+    for(const it of (await qAll()).sort((a,b)=>a.ts-b.ts)){
+      if(!navigator.onLine) break;
+      try{
+        if(it.type==='photo'){
+          const f=new FormData();
+          for(const [k,v] of Object.entries(it.meta)) f.append(k,v);
+          f.append('key',KEY); f.append('client_id',it.id); f.append('file',it.blob,'photo.jpg');
+          const r=await fetch(API,{method:'POST',body:f}); const j=await r.json().catch(()=>({}));
+          if(!r.ok){ lastErr=j.error||('Upload error '+r.status); if(r.status===403||r.status===400){ await qDel(it.id); } break; }
+        }else if(it.type==='visit'){ await api(it.meta); }
+        await qDel(it.id); lastErr='';
+      }catch(e){ lastErr='Waiting for network'; break; }
+    }
+  } finally { pumping=false; qUi(); }
+}
+async function qUi(){
+  const all=await qAll(); const n=all.filter(x=>x.type==='photo').length;
+  $('qtxt').innerHTML=n?`<b>${n}</b> photo${n>1?'s':''} waiting to upload`:'All photos uploaded ✓';
+  $('net').textContent=navigator.onLine?(lastErr||'online'):'offline — will upload when signal returns';
+  renderShots();
+}
+setInterval(pump,15000); addEventListener('online',pump); addEventListener('offline',qUi);
+addEventListener('beforeunload',e=>{ if($('qtxt').textContent.includes('waiting')){ e.preventDefault(); e.returnValue=''; } });
+
+/* ---------- USC lookup ---------- */
+let cur=null; // {usc, house, server:{kind:n}}
+const counts={}; // local captured this session per usc/kind
+function key2(u,k){return u+'|'+k}
+async function find(uscIn){
+  const usc=(uscIn||$('usc').value).replace(/\D/g,'');
+  $('usc').value=usc;
+  const R=$('result');
+  if(!/^\d{12,14}$/.test(usc)){ R.innerHTML='<div class="msg bad">USC must be 13 digits.</div>'; return; }
+  R.innerHTML='<div class="msg">Searching…</div>';
+  try{
+    const j=await api({action:'lookup',usc});
+    const server={}; (j.photos||[]).forEach(p=>server[p.kind]=p.n);
+    cur={usc,house:j.house,server};
+    if(j.found){
+      const h=j.house, p1=/SITE CHECK|Retake|Install form/i.test(h.task_group+' '+h.tasks), p3=h.task_group==='New installation';
+      R.innerHTML=`<div class="house"><div class="nm">${esc(h.consumer||'—')}</div><div>${esc(h.village||'')} · ${esc(h.section||'')}</div>
+        <span class="tag ${p1?'p1':p3?'p3':''}">${esc(h.task_group)}</span>${h.tasks?`<div class="small" style="margin-top:6px">${esc(h.tasks)}</div>`:''}
+        ${j.last_visit?`<div class="small" style="margin-top:6px">Last visit: ${esc(j.last_visit.outcome)} by ${esc(j.last_visit.worker||'?')} on ${new Date(j.last_visit.created_at).toLocaleDateString('en-IN')}</div>`:''}</div>
+        ${h.task_group==='Done'?'<div class="msg ok">No pending field work for this house. Take photos only if the office asked.</div>':''}
+        ${h.task_group==='New installation'?'<div class="msg warn">Install the system first, then take all photos.</div>':''}`;
+    }else{
+      R.innerHTML=`<div class="msg bad"><b>USC not in our list.</b> Check the bill again — a single wrong digit breaks the record.</div>
+        ${j.near&&j.near.length?'<div class="near small" style="margin-top:6px">Did you mean:<br>'+j.near.map(n=>`<button class="btn-ghost" data-u="${n.usc}">${n.usc} · ${esc(n.consumer||'')} · ${esc(n.village||'')}</button>`).join('')+'</div>':''}
+        <button id="anyway" class="btn-ghost" style="margin-top:10px;width:100%">USC is correct as on the bill — continue anyway</button>`;
+      R.querySelectorAll('[data-u]').forEach(b=>b.onclick=()=>find(b.dataset.u));
+      $('anyway').onclick=()=>{ showWork(); $('anyway').remove(); };
+      $('shots').classList.add('hide'); $('finish').classList.add('hide');
+      return;
+    }
+    showWork();
+  }catch(e){ R.innerHTML=`<div class="msg bad">${esc(e.message)}${navigator.onLine?'':' — you are offline. Lookup needs signal; photos can still be taken after one lookup.'}</div>`; }
+}
+function showWork(){ $('shots').classList.remove('hide'); $('finish').classList.remove('hide'); $('fmsg').innerHTML=''; renderShots(); $('shots').scrollIntoView({behavior:'smooth',block:'start'}); }
+$('find').onclick=()=>find();
+$('usc').addEventListener('keydown',e=>{ if(e.key==='Enter') find(); });
+
+function renderShots(){
+  if(!cur) return;
+  const need=needed(cur.house);
+  const list=$('shotlist'); list.innerHTML='';
+  need.forEach(k=>{
+    const n=(cur.server[k]||0)+(counts[key2(cur.usc,k)]||0);
+    const d=document.createElement('div'); d.className='shot';
+    d.innerHTML=`<span class="cnt ${n?'done':''}">${n?'✓'+(n>1?n:''):'0'}</span><div class="lbl">${T[k][0]}<small>${T[k][1]}</small></div><button class="btn fit">📷</button>`;
+    d.querySelector('button').onclick=()=>openCam(k);
+    list.appendChild(d);
+  });
+  const sel=$('extra'); sel.innerHTML=Object.keys(T).filter(k=>!need.includes(k)).map(k=>`<option value="${k}">${T[k][0]}</option>`).join('');
+}
+$('extrabtn').onclick=()=>openCam($('extra').value);
+
+/* ---------- camera ---------- */
+let stream=null, curKind=null, shotBlob=null, shotMeta=null;
+async function openCam(kind){
+  if(!cur) return;
+  if(!$('worker').value.trim()){ alert('Enter your name first (step 1).'); $('worker').focus(); return; }
+  if(!gpsOk()){ alert('GPS is not ready or not accurate. Wait for the green/amber GPS dot, then try again.'); return; }
+  curKind=kind; $('camlbl').textContent=`${cur.usc} · ${T[kind][0]}`;
+  $('cam').classList.add('on'); showReview(false);
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1440}}});
+    $('video').srcObject=stream; await $('video').play().catch(()=>{});
+  }catch(e){ closeCam(); alert('Camera not available: '+e.message+'\nAllow camera permission for this site and use Chrome.'); }
+}
+function closeCam(){ if(stream){stream.getTracks().forEach(t=>t.stop()); stream=null;} $('cam').classList.remove('on'); }
+function showReview(on){ $('video').classList.toggle('hide',on); $('canvas').classList.toggle('hide',!on); $('barShoot').classList.toggle('hide',on); $('barReview').classList.toggle('hide',!on); }
+setInterval(()=>{ if($('cam').classList.contains('on')&&fix) $('camgps').textContent=`${fix.lat.toFixed(5)}, ${fix.lon.toFixed(5)} ±${Math.round(fix.acc)}m`; },1000);
+$('camclose').onclick=closeCam;
+$('retake').onclick=()=>{ shotBlob=null; showReview(false); };
+$('shutter').onclick=async()=>{
+  const v=$('video'); if(!v.videoWidth) return;
+  if(!gpsOk()){ alert('GPS lost. Wait for signal and retake.'); return; }
+  const g={...fix}, now=new Date();
+  const sc=Math.min(1,1600/Math.max(v.videoWidth,v.videoHeight));
+  const W=Math.round(v.videoWidth*sc), H=Math.round(v.videoHeight*sc);
+  const c=$('canvas'); c.width=W; c.height=H; const x=c.getContext('2d');
+  x.drawImage(v,0,0,W,H);
+  const h=cur.house||{};
+  const ist=now.toLocaleString('en-GB',{timeZone:'Asia/Kolkata',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).replace(',','');
+  const lines=[
+    `USC ${cur.usc}${h.consumer?' · '+h.consumer:''}`,
+    `${T[curKind][0]}${h.village?' · '+h.village:''}`,
+    `Lat ${g.lat.toFixed(6)}  Long ${g.lon.toFixed(6)}  ±${Math.round(g.acc)} m`,
+    `${ist} IST · ${$('worker').value.trim()}`,
+    `Valence Energies · KAIVE field capture`
+  ];
+  const fs=Math.max(14,Math.round(W/34)), lh=Math.round(fs*1.32), pad=Math.round(fs*.7);
+  x.font=`600 ${fs}px system-ui,Roboto,sans-serif`;
+  const bw=Math.min(W-2*pad, Math.max(...lines.map(l=>x.measureText(l).width))+2*pad), bh=lines.length*lh+pad*1.4;
+  x.fillStyle='rgba(14,42,30,.78)'; x.fillRect(pad,H-bh-pad,bw,bh);
+  x.fillStyle='#C9A227'; x.fillRect(pad,H-bh-pad,Math.max(4,fs/5),bh);
+  lines.forEach((l,i)=>{ x.fillStyle=i===4?'#C9A227':'#fff'; x.fillText(l,pad*1.8,H-bh-pad+pad*.9+lh*(i+.75),bw-pad*1.6); });
+  const jpg=await new Promise(r=>c.toBlob(r,'image/jpeg',0.86));
+  shotBlob=await addExif(jpg,g,now);
+  shotMeta={usc:cur.usc,kind:curKind,lat:g.lat,lon:g.lon,acc:g.acc,taken_at:now.toISOString(),worker:$('worker').value.trim(),device:navigator.userAgent.slice(0,120)};
+  showReview(true);
+};
+$('usephoto').onclick=async()=>{
+  if(!shotBlob) return;
+  await qPut({id:uid(),type:'photo',ts:Date.now(),meta:shotMeta,blob:shotBlob});
+  counts[key2(shotMeta.usc,shotMeta.kind)]=(counts[key2(shotMeta.usc,shotMeta.kind)]||0)+1;
+  shotBlob=null; closeCam(); qUi(); pump();
+};
+
+/* ---------- EXIF (GPS + time) so the location also sits inside the file ---------- */
+async function addExif(blob,g,d){
+  try{
+    const b=new Uint8Array(await blob.arrayBuffer());
+    if(b[0]!==0xFF||b[1]!==0xD8) return blob;
+    let rest=b.subarray(2);
+    if(rest[0]===0xFF&&rest[1]===0xE0){ const L=(rest[2]<<8)|rest[3]; rest=rest.subarray(2+L); }
+    const seg=exifSeg(g,d);
+    const out=new Uint8Array(2+seg.length+rest.length); out[0]=0xFF; out[1]=0xD8; out.set(seg,2); out.set(rest,2+seg.length);
+    return new Blob([out],{type:'image/jpeg'});
+  }catch(e){ return blob; }
+}
+function exifSeg(g,d){
+  const p=n=>String(n).padStart(2,'0');
+  const dt=`${d.getFullYear()}:${p(d.getMonth()+1)}:${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+  const asc=s=>[...new TextEncoder().encode(s),0];
+  const dms=v=>{ v=Math.abs(v); const D=Math.floor(v), mf=(v-D)*60, M=Math.floor(mf), S=(mf-M)*60; return [[D,1],[M,1],[Math.round(S*10000),10000]]; };
+  const ifd0=[[0x010F,2,asc('Valence KAIVE field capture')],[0x0132,2,asc(dt)],[0x8769,4,0],[0x8825,4,0]];
+  const exif=[[0x9003,2,asc(dt)],[0x9004,2,asc(dt)]];
+  const gps=[[0x0000,1,[2,3,0,0]],[0x0001,2,asc(g.lat>=0?'N':'S')],[0x0002,5,dms(g.lat)],[0x0003,2,asc(g.lon>=0?'E':'W')],[0x0004,5,dms(g.lon)],[0x001F,5,[[Math.max(1,Math.round(g.acc*100)),100]]]];
+  const isz=n=>2+12*n+4, o0=8, oE=o0+isz(ifd0.length), oG=oE+isz(exif.length); let od=oG+isz(gps.length);
+  ifd0[2][2]=oE; ifd0[3][2]=oG;
+  const size=t=>({1:1,2:1,4:4,5:8})[t];
+  const blobs=[]; let total=od;
+  for(const ifd of [ifd0,exif,gps]) for(const e of ifd){ const n=e[1]===4?1:e[2].length, bytes=n*size(e[1]); if(bytes>4){ e.off=total; total+=bytes+(bytes%2); } }
+  const buf=new ArrayBuffer(total), dv=new DataView(buf), u8=new Uint8Array(buf);
+  u8.set([0x49,0x49,0x2A,0x00]); dv.setUint32(4,8,true);
+  const writeVal=(e,at)=>{ if(e[1]===4){ dv.setUint32(at,e[2],true); } else if(e[1]===5){ e[2].forEach((r,i)=>{ dv.setUint32(at+i*8,r[0],true); dv.setUint32(at+i*8+4,r[1],true); }); } else { u8.set(e[2],at); } };
+  const writeIfd=(ifd,off)=>{ dv.setUint16(off,ifd.length,true); ifd.forEach((e,i)=>{ const at=off+2+i*12, n=e[1]===4?1:e[2].length; dv.setUint16(at,e[0],true); dv.setUint16(at+2,e[1],true); dv.setUint32(at+4,n,true); if(e.off!==undefined){ dv.setUint32(at+8,e.off,true); writeVal(e,e.off); } else writeVal(e,at+8); }); dv.setUint32(off+2+ifd.length*12,0,true); };
+  writeIfd(ifd0,o0); writeIfd(exif,oE); writeIfd(gps,oG);
+  const head=[0x45,0x78,0x69,0x66,0,0], L=head.length+total+2;
+  const seg=new Uint8Array(4+head.length+total); seg.set([0xFF,0xE1,(L>>8)&255,L&255]); seg.set(head,4); seg.set(u8,4+head.length);
+  return seg;
+}
+
+/* ---------- submit visit ---------- */
+$('submit').onclick=async()=>{
+  if(!cur) return;
+  const outcome=$('outcome').value, note=$('note').value.trim();
+  const shots=Object.entries(counts).filter(([k])=>k.startsWith(cur.usc+'|')).reduce((a,[,n])=>a+n,0)+Object.values(cur.server).reduce((a,n)=>a+n,0);
+  if(outcome==='done'&&!shots){ $('fmsg').innerHTML='<div class="msg bad">No photos taken for this house yet.</div>'; return; }
+  if(outcome==='other'&&!note){ $('fmsg').innerHTML='<div class="msg bad">Write what happened in the note.</div>'; return; }
+  const meta={action:'visit',usc:cur.usc,worker:$('worker').value.trim(),outcome,note,lat:fix&&fix.lat,lon:fix&&fix.lon,acc:fix&&fix.acc};
+  await qPut({id:uid(),type:'visit',ts:Date.now(),meta});
+  const t=LS.get('kc_today',{}), day=new Date().toDateString(); if(t.day!==day){t.day=day;t.items=[];}
+  t.items.unshift({usc:cur.usc,name:(cur.house&&cur.house.consumer)||'',outcome,time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}); LS.set('kc_today',t);
+  renderToday(); pump();
+  $('fmsg').innerHTML=`<div class="msg ok">Saved for ${cur.usc}. Photos upload in the background — keep this page open until the bar says “All photos uploaded”.</div>`;
+  cur=null; $('usc').value=''; $('note').value=''; $('outcome').value='done'; $('result').innerHTML=''; $('shots').classList.add('hide');
+  setTimeout(()=>{ $('finish').classList.add('hide'); window.scrollTo({top:0,behavior:'smooth'}); },2500);
+};
+function renderToday(){
+  const t=LS.get('kc_today',{}); const items=(t.day===new Date().toDateString()&&t.items)||[];
+  $('today').innerHTML=items.length?items.map(i=>`<li><b>${i.usc}</b> ${esc(i.name)} — ${esc(i.outcome)} · ${i.time}</li>`).join(''):'<li class="small">Nothing submitted yet today.</li>';
+}
+function esc(s){ return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+renderToday(); qUi(); pump();
+if(KEY) api({action:'ping'}).catch(e=>{ if(/key/i.test(e.message)) $('badlink').classList.remove('hide'); });
+})();
+</script>
+</body>
+</html>
